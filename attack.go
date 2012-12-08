@@ -6,25 +6,25 @@ type State int
 type Form int
 
 const (
-	AIR Form = iota;
-	SOLID;
-	GARBAGE;
+	AIR Form = iota
+	SOLID
+	GARBAGE
 )
 
 const (
-	STATIC State = iota;
-	HANG;
-	FALL;
-	SWAP;
-	CLEAR;
+	STATIC State = iota
+	HANG
+	FALL
+	SWAP
+	CLEAR
 
-	TO_AIR;
-	TO_SOLID;
-	TO_GARBAGE;
+	TO_AIR
+	TO_SOLID
+	TO_GARBAGE
 )
 
 type Cursor struct {
-	x, y int;
+	x, y int
 }
 
 type Direction int
@@ -32,7 +32,7 @@ var LEFT, STILL, RIGHT = -1, 0, 1
 
 
 
-type Color string;
+type Color string
 
 const (
 	/*
@@ -43,25 +43,25 @@ const (
 	MAGENTA = "\033[22;35m";
 	YELLOW = "\033[01;33m";
 	*/
-	WHITE Color = "\033[01;47m";
-	RED = "\033[22;41m";
-	GREEN = "\033[22;42m";
-	LIGHT_BLUE = "\033[01;44m";
-	MAGENTA = "\033[22;45m";
-	YELLOW = "\033[01;43m";
+	WHITE Color = "\033[01;47m"
+	RED = "\033[22;41m"
+	GREEN = "\033[22;42m"
+	LIGHT_BLUE = "\033[01;44m"
+	MAGENTA = "\033[22;45m"
+	YELLOW = "\033[01;43m"
 	BLACK = "\033[22;40m"
 )
 
 type Block struct {
-	state State;
-	counter uint;
-	direction Direction;
-	color Color;
+	state State
+	counter uint
+	direction Direction
+	color Color
 }
 
 type Game struct {
-	grid [12][6]Block;
-	cursor Cursor;
+	grid [12][6]Block
+	cursor Cursor
 }
 
 func printf (text string, color Color) {
@@ -70,7 +70,7 @@ func printf (text string, color Color) {
 	fmt.Printf(string(BLACK))
 }
 
-var FRAME int = 0;
+var FRAME int = 0
 
 func render(game *Game) {
 	fmt.Printf("\x1b[H");
@@ -78,7 +78,7 @@ func render(game *Game) {
 		for i := 0; i < 2; i++ {
 			for x, block := range row {
 				//fmt.Printf(" ")
-				var str string;
+				var str string
 				if game.cursor.y == y && game.cursor.x == x {
 					str = ">   "
 				} else if game.cursor.y == y && game.cursor.x == x - 1 {
@@ -173,7 +173,7 @@ func main() {
 	game.grid[11][2] = Block{color: YELLOW}
 	
 	for {
-		render(&game);
+		render(&game)
 		FRAME += 1
 		fmt.Printf("%d", FRAME)
 	}
