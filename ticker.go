@@ -1,18 +1,12 @@
-package main
+package ticker
 
-import "fmt"
 import "time"
+
 var interval = time.Second / 10
 
-func main() {
-    c := time.Tick(time.Second / 10)
-    for {
-        select {
-        case now := <- c:
-            fmt.Printf("TICK", now)
-        default:
-            fmt.Printf(".")
-        }
+func Run(ch chan int) {
+    for _ = range time.Tick(time.Second / 10) {
+        ch <- 1
     }
 }
 
