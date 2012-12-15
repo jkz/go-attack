@@ -1,0 +1,15 @@
+swap
+    check if blocks are eligible
+    if so, swap them immediately and set counter
+combos
+    add a combo checker to tick
+    checks for
+chains
+    add to global chain counter
+score
+spawn
+garbage
+rocks
+multiplayer
+network protocol
+ai

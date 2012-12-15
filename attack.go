@@ -16,6 +16,8 @@ y-2  = = = = = =
 */
 
 import "fmt"
+import "github.com/jessethegame/keydown"
+import "github.com/jessethegame/colorgrid"
 
 // ticks / second
 var tickrate = 1
@@ -24,46 +26,18 @@ var tickrate = 1
 var framerate = 1
 
 // Time in frames
-var hangtime uint = 10
-var falltime uint = 4
-var swaptime uint = 4
-var cleartime uint = 4
+var hangtime int = 10
+var falltime int = 4
+var swaptime int = 4
+var cleartime int = 4
 
 type State int
-type Color int
-type ColorCode string
 
-/*
 const (
-	WHITE Color = "\033[01;37m";
-	RED = "\033[22;31m";
-	GREEN = "\033[22;32m";
-	LIGHT_BLUE = "\033[01;34m";
-	MAGENTA = "\033[22;35m";
-	YELLOW = "\033[01;33m";
-*/
-const (
-	AIR Color = iota
-	ROCK
+	AIR  colorgrid.Color = colorgrid.BLACK
+	ROCK                 = colorgrid.GRAY
 	// Everything > ROCK is a color
-	WHITE
-	RED
-	GREEN
-	LIGHT_BLUE
-	MAGENTA
-	YELLOW
-	BLACK
 )
-
-var COLORS = map[Color]ColorCode{
-	WHITE:      "\033[01;47m",
-	RED:        "\033[22;41m",
-	GREEN:      "\033[22;42m",
-	LIGHT_BLUE: "\033[01;44m",
-	MAGENTA:    "\033[22;45m",
-	YELLOW:     "\033[01;43m",
-	BLACK:      "\033[22;40m",
-}
 
 const (
 	STATIC State = iota
@@ -72,36 +46,6 @@ const (
 	SWAP
 )
 
-type Control struct {
-	Up, Down, Left, Right, Swap, Boost, Pause int
-}
-
-type Cursor struct {
-	Y        uint
-	X        int
-	Game     *Game
-	Controls *Control
-}
-
-/*
-func (c *Cursor) Swap(x1, y1, x2, y2 int) {
-    g = c.game.rows
-    g[y1][x2], g[y2][x2] = g[y2][x2], g[y1][x1]
-    g[c.y][c.x].Morph(g[c.y][c.x + 1], swaptime)
-    g[c.y][c.x + 1].Morph(g[c.y][c.x], swaptime)
-}
-
-/*
-func (c *Cursor) Swap() {
-    g = c.game.rows
-    if g[c.y][c.x].IsSwappable() && g[c.y][c.x + 1].IsSwappable() {
-        g[c.y][c.x], g[c.y][c.x + 1] = g[c.y][c.x + 1], g[c.y][c.x]
-        g[c.y][c.x].Morph(g[c.y][c.x + 1], swaptime)
-        g[c.y][c.x + 1].Morph(g[c.y][c.x], swaptime)
-    }
-}
-*/
-
 type Garbage struct {
 }
 
@@ -109,9 +53,9 @@ type Clear struct {
 }
 
 type Block struct {
-	color   Color
+	color   colorgrid.Color
 	state   State
-	counter uint
+	counter int
 	combo   bool
 	garbage *Garbage
 	clear   *Clear
@@ -180,9 +124,10 @@ func (b *Block) Tick(under *Block) {
 }
 
 type Game struct {
-	width, height, colors uint
+	width, height, colors int
 	rows                  [][]Block
 	cursor                Cursor
+	grid                  colorgrid.Grid
 }
 
 /* Create a new rows array and fill it with the old shifted 1 up */
@@ -197,8 +142,8 @@ func (g *Game) Push() {
 	}
 }
 
-func (g *Game) MoveTick(x uint) {
-	var y uint
+func (g *Game) MoveTick(x int) {
+	var y int
 	for y = 1; y < g.height; y++ {
 		g.rows[y][x].Tick(&g.rows[y-1][x])
 	}
@@ -210,7 +155,7 @@ func (g *Game) Tick() {
 	// decr timers
 	// check movement
 	// set timers
-	var x uint
+	var x int
 	for x = 0; x < g.width; x++ {
 		//go g.MoveTick(x)
 		go g.MoveTick(x)
@@ -220,7 +165,7 @@ func (g *Game) Tick() {
 }
 
 /* Create a new array of rows with one extra for spawning blocks */
-func NewRows(width, height uint) [][]Block {
+func NewRows(width, height int) [][]Block {
 	rows := make([][]Block, height, 1+height)
 
 	for i, _ := range rows {
@@ -231,7 +176,7 @@ func NewRows(width, height uint) [][]Block {
 
 /* NewGame Initializes a game with a viewport of x * y and given amount of
  * block colors */
-func NewGame(width, height, colors uint) Game {
+func NewGame(width, height, colors int) Game {
 	// Set a buffer capacity of twice the height to allow for some garbage
 	// and an extra line for spawning blocks
 	return Game{
@@ -241,59 +186,18 @@ func NewGame(width, height, colors uint) Game {
 		rows:   NewRows(width, height)}
 }
 
-func printf(text string, color Color) {
-	fmt.Printf(string(COLORS[color]))
-	fmt.Printf(text)
-	fmt.Printf(string(COLORS[BLACK]))
-}
-
 var FRAME int = 0
-
-func render(game *Game) {
-	fmt.Printf("\x1b[H")
-	var y uint
-	for y = game.height - 1; y > 0; y-- {
-		for i := 0; i < 3; i++ {
-			for x, block := range game.rows[y] {
-				var str string
-				switch {
-				case i == 1:
-					fmt.Printf("    %d ", block.counter)
-				case game.cursor.Y == y && game.cursor.X == x:
-					str = ">     "
-				case game.cursor.Y == y && game.cursor.X == x-1:
-					str = "     <"
-				default:
-					str = "      "
-				}
-				printf(str, block.color)
-			}
-			printf("                   ", BLACK)
-			fmt.Println("")
-		}
-		//fmt.Println("")
-	}
-}
-
-/*
-var interval = time.Second / 10
-
-func runTicker(ch chan int) {
-	for _ = range time.Tick(time.Second / 10) {
-		ch <- 1
-	}
-}
-*/
 
 func main() {
 	game := NewGame(6, 12, 5)
-	game.cursor = Cursor{X: 3, Y: 5}
-	game.rows[0][0] = Block{color: RED}
-	game.rows[0][1] = Block{color: LIGHT_BLUE}
-	game.rows[0][2] = Block{color: GREEN}
-	game.rows[0][3] = Block{color: MAGENTA}
-	game.rows[0][4] = Block{color: RED}
-	game.rows[0][5] = Block{color: YELLOW}
+	cursor := Cursor{X: 3, Y: 5, Game: &game}
+	game.grid.Cell = colorgrid.Size{5, 3}
+	game.rows[0][0] = Block{color: colorgrid.RED}
+	game.rows[0][1] = Block{color: colorgrid.LIGHT_BLUE}
+	game.rows[0][2] = Block{color: colorgrid.GREEN}
+	game.rows[0][3] = Block{color: colorgrid.MAGENTA}
+	game.rows[0][4] = Block{color: colorgrid.RED}
+	game.rows[0][5] = Block{color: colorgrid.YELLOW}
 	/*
 		game.rows[1][3] = Block{color: RED}
 		game.rows[1][4] = Block{color: LIGHT_BLUE}
@@ -350,27 +254,46 @@ func main() {
 		game.rows[9][1] = Block{color: RED}
 		game.rows[9][2] = Block{color: YELLOW}
 	*/
-	game.rows[10][0] = Block{color: RED}
-	game.rows[10][1] = Block{color: LIGHT_BLUE}
-	game.rows[10][2] = Block{color: GREEN}
-	game.rows[10][3] = Block{color: MAGENTA}
-	game.rows[10][4] = Block{color: RED}
-	game.rows[10][5] = Block{color: YELLOW}
-	game.rows[11][3] = Block{color: RED}
-	game.rows[11][4] = Block{color: LIGHT_BLUE}
-	game.rows[11][5] = Block{color: GREEN}
-	game.rows[11][0] = Block{color: MAGENTA}
-	game.rows[11][1] = Block{color: RED}
-	game.rows[11][2] = Block{color: YELLOW}
+	game.rows[10][0] = Block{color: colorgrid.RED}
+	game.rows[10][1] = Block{color: colorgrid.LIGHT_BLUE}
+	game.rows[10][2] = Block{color: colorgrid.GREEN}
+	game.rows[10][3] = Block{color: colorgrid.MAGENTA}
+	game.rows[10][4] = Block{color: colorgrid.RED}
+	game.rows[10][5] = Block{color: colorgrid.YELLOW}
+	game.rows[11][3] = Block{color: colorgrid.RED}
+	game.rows[11][4] = Block{color: colorgrid.LIGHT_BLUE}
+	game.rows[11][5] = Block{color: colorgrid.GREEN}
+	game.rows[11][0] = Block{color: colorgrid.MAGENTA}
+	game.rows[11][1] = Block{color: colorgrid.RED}
+	game.rows[11][2] = Block{color: colorgrid.YELLOW}
+
+	out := make(chan keydown.Op)
+	go keydown.Enable(&cursor, out)
 
 	ch := make(chan int, 10)
+	//cX := cursor.X
+	//cY := game.height - cursor.Y
 	go runTicker(ch)
+	//gch := make(chan *Game, 10)
+	//go render(gch)
 	for i := range ch {
-		render(&game)
+		/*
+			select {
+			case <-out:
+				cX = cursor.X
+				cY = game.height - cursor.Y
+			default:
+			}
+		*/
+		cX := cursor.X
+		cY := game.height - cursor.Y
+		//gch <- &game
 		fmt.Println(i)
+		render(&game, cX, cY)
 		game.Tick()
 		FRAME += 1
-		fmt.Printf("%d", FRAME)
+		game.grid.Render(1, 0, fmt.Sprintf("%d", FRAME), colorgrid.WHITE,
+			colorgrid.BLACK)
+		//fmt.Printf("%d", FRAME)
 	}
-
 }
