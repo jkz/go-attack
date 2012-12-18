@@ -22,14 +22,22 @@ import "github.com/jessethegame/colorgrid"
 // ticks / second
 var tickrate = 1
 
-// frames / tick
-var framerate = 1
-
 // Time in frames
-var hangtime int = 10
-var falltime int = 4
-var swaptime int = 4
-var cleartime int = 4
+var hangticks int = 10
+var fallticks int = 4
+var swapticks int = 4
+var clearticks int = 4
+
+type Config struct {
+	tickrate, hangticks, fallticks, swapticks, clearticks int
+}
+
+type Game struct {
+	width, height, colors int
+	combo, chain          int
+	rows                  [][]Block
+	config                *Config
+}
 
 type State int
 
@@ -49,25 +57,21 @@ const (
 type Garbage struct {
 }
 
-type Clear struct {
-}
-
 type Block struct {
-	color   colorgrid.Color
-	state   State
-	counter int
-	combo   bool
-	garbage *Garbage
-	clear   *Clear
+	above, under, left, right *Block
+	x, y                      int
+	color                     colorgrid.Color
+	state                     State
+	counter                   int
+	chain                     bool
+	garbage                   *Garbage
 }
 
 func (b *Block) Become(other *Block) {
 	b.color = other.color
 	b.state = other.state
 	b.counter = other.counter
-	b.combo = other.combo
 	b.garbage = other.garbage
-	b.clear = other.clear
 }
 
 func (b *Block) IsSwappable() bool {
@@ -80,9 +84,11 @@ func (b *Block) IsEmpty() bool {
 
 func (b *Block) IsSupport() bool {
 	return b.state != FALL
-	return b.color != AIR && b.state != FALL
 }
 
+/*
+This tick phase checks all blocks for their individual state.
+*/
 func (b *Block) Tick(under *Block) {
 	if b.counter > 0 {
 		b.counter--
@@ -90,11 +96,9 @@ func (b *Block) Tick(under *Block) {
 			return
 		}
 	}
-	//fmt.Println(b, under)
 
 	switch b.state {
 	case STATIC, SWAP:
-		//fmt.Println("SWITCH", b.state)
 		if b.color == AIR {
 			return
 		}
@@ -102,10 +106,10 @@ func (b *Block) Tick(under *Block) {
 		case under.state == HANG:
 			b.state = HANG
 			b.counter = under.counter
-			b.combo = under.combo
+			b.chain = under.chain
 		case under.IsEmpty():
 			b.state = HANG
-			b.counter = hangtime
+			b.counter = hangticks
 		}
 	case HANG:
 		b.state = FALL
@@ -121,13 +125,6 @@ func (b *Block) Tick(under *Block) {
 	default:
 		panic("I'm not supposed to get here!")
 	}
-}
-
-type Game struct {
-	width, height, colors int
-	rows                  [][]Block
-	cursor                Cursor
-	grid                  colorgrid.Grid
 }
 
 /* Create a new rows array and fill it with the old shifted 1 up */
@@ -148,8 +145,6 @@ func (g *Game) MoveTick(x int) {
 		g.rows[y][x].Tick(&g.rows[y-1][x])
 	}
 }
-
-//func (g *Game)
 
 func (g *Game) Tick() {
 	// decr timers
@@ -176,10 +171,10 @@ func NewRows(width, height int) [][]Block {
 
 /* NewGame Initializes a game with a viewport of x * y and given amount of
  * block colors */
-func NewGame(width, height, colors int) Game {
+func NewGame(width, height, colors int) *Game {
 	// Set a buffer capacity of twice the height to allow for some garbage
 	// and an extra line for spawning blocks
-	return Game{
+	return &Game{
 		width:  width,
 		height: height,
 		colors: colors,
@@ -189,84 +184,8 @@ func NewGame(width, height, colors int) Game {
 var FRAME int = 0
 
 func main() {
-	game := NewGame(6, 12, 5)
-	cursor := Cursor{X: 3, Y: 5, Game: &game}
-	game.grid.Cell = colorgrid.Size{5, 3}
-	game.rows[0][0] = Block{color: colorgrid.RED}
-	game.rows[0][1] = Block{color: colorgrid.LIGHT_BLUE}
-	game.rows[0][2] = Block{color: colorgrid.GREEN}
-	game.rows[0][3] = Block{color: colorgrid.MAGENTA}
-	game.rows[0][4] = Block{color: colorgrid.RED}
-	game.rows[0][5] = Block{color: colorgrid.YELLOW}
-	/*
-		game.rows[1][3] = Block{color: RED}
-		game.rows[1][4] = Block{color: LIGHT_BLUE}
-		game.rows[1][5] = Block{color: GREEN}
-		game.rows[1][0] = Block{color: MAGENTA}
-		game.rows[1][1] = Block{color: RED}
-		game.rows[1][2] = Block{color: YELLOW}
-		game.rows[2][0] = Block{color: RED}
-		game.rows[2][1] = Block{color: LIGHT_BLUE}
-		game.rows[2][2] = Block{color: GREEN}
-		game.rows[2][3] = Block{color: MAGENTA}
-		game.rows[2][4] = Block{color: RED}
-		game.rows[2][5] = Block{color: YELLOW}
-		game.rows[3][3] = Block{color: RED}
-		game.rows[3][4] = Block{color: LIGHT_BLUE}
-		game.rows[3][5] = Block{color: GREEN}
-		game.rows[3][0] = Block{color: MAGENTA}
-		game.rows[3][1] = Block{color: RED}
-		game.rows[3][2] = Block{color: YELLOW}
-		game.rows[4][0] = Block{color: RED}
-		game.rows[4][1] = Block{color: LIGHT_BLUE}
-		game.rows[4][2] = Block{color: GREEN}
-		game.rows[4][3] = Block{color: MAGENTA}
-		game.rows[4][4] = Block{color: RED}
-		game.rows[4][5] = Block{color: YELLOW}
-		game.rows[5][3] = Block{color: RED}
-		game.rows[5][4] = Block{color: LIGHT_BLUE}
-		game.rows[5][5] = Block{color: GREEN}
-		game.rows[5][0] = Block{color: MAGENTA}
-		game.rows[5][1] = Block{color: RED}
-		game.rows[5][2] = Block{color: YELLOW}
-		game.rows[6][0] = Block{color: RED}
-		game.rows[6][1] = Block{color: LIGHT_BLUE}
-		game.rows[6][2] = Block{color: GREEN}
-		game.rows[6][3] = Block{color: MAGENTA}
-		game.rows[6][4] = Block{color: RED}
-		game.rows[6][5] = Block{color: YELLOW}
-		game.rows[7][3] = Block{color: RED}
-		game.rows[7][4] = Block{color: LIGHT_BLUE}
-		game.rows[7][5] = Block{color: GREEN}
-		game.rows[7][0] = Block{color: MAGENTA}
-		game.rows[7][1] = Block{color: RED}
-		game.rows[7][2] = Block{color: YELLOW}
-		game.rows[8][0] = Block{color: RED}
-		game.rows[8][1] = Block{color: LIGHT_BLUE}
-		game.rows[8][2] = Block{color: GREEN}
-		game.rows[8][3] = Block{color: MAGENTA}
-		game.rows[8][4] = Block{color: RED}
-		game.rows[8][5] = Block{color: YELLOW}
-		game.rows[9][3] = Block{color: RED}
-		game.rows[9][4] = Block{color: LIGHT_BLUE}
-		game.rows[9][5] = Block{color: GREEN}
-		game.rows[9][0] = Block{color: MAGENTA}
-		game.rows[9][1] = Block{color: RED}
-		game.rows[9][2] = Block{color: YELLOW}
-	*/
-	game.rows[10][0] = Block{color: colorgrid.RED}
-	game.rows[10][1] = Block{color: colorgrid.LIGHT_BLUE}
-	game.rows[10][2] = Block{color: colorgrid.GREEN}
-	game.rows[10][3] = Block{color: colorgrid.MAGENTA}
-	game.rows[10][4] = Block{color: colorgrid.RED}
-	game.rows[10][5] = Block{color: colorgrid.YELLOW}
-	game.rows[11][3] = Block{color: colorgrid.RED}
-	game.rows[11][4] = Block{color: colorgrid.LIGHT_BLUE}
-	game.rows[11][5] = Block{color: colorgrid.GREEN}
-	game.rows[11][0] = Block{color: colorgrid.MAGENTA}
-	game.rows[11][1] = Block{color: colorgrid.RED}
-	game.rows[11][2] = Block{color: colorgrid.YELLOW}
-
+	grid := colorgrid.Grid{Cell: colorgrid.Size{5, 3}}
+	player := newPlayer()
 	out := make(chan keydown.Op)
 	go keydown.Enable(&cursor, out)
 

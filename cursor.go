@@ -26,14 +26,16 @@ type coords struct {
 
 /* Cursor encloses positions (x, y) and (x + 1, y), so max x coordinate
  * game.width - 2 */
-type cursor struct {
+type Cursor struct {
 	keydown.Controller
 	X, Y int
 	Game *Game
 }
 
 func (c *Cursor) Up() (int, int) {
-	return x, max(1, y-1)
+	if c.Y < c.Game.height-2 {
+		c.Y++
+	}
 }
 
 func (c *Cursor) Down() {
