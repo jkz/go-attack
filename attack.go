@@ -57,7 +57,7 @@ type State int
 
 const (
 	AIR  colorgrid.Color = colorgrid.BLACK
-	ROCK                 = colorgrid.GRAY
+	ROCK                 = colorgrid.WHITE
 	// Everything > ROCK is a color
 )
 
@@ -72,20 +72,20 @@ type Garbage struct {
 }
 
 type Block struct {
-	above, under, left, right *Block
-	pos                       coord
-	color                     colorgrid.Color
-	state                     State
-	counter                   int
-	chain                     bool
-	garbage                   *Garbage
+	//above, under, left, right *Block
+	pos     coord
+	color   colorgrid.Color
+	state   State
+	counter int
+	//chain   bool
+	//garbage *Garbage
 }
 
 func (b *Block) Become(other *Block) {
 	b.color = other.color
 	b.state = other.state
 	b.counter = other.counter
-	b.garbage = other.garbage
+	//b.garbage = other.garbage
 }
 
 func (b *Block) IsSwappable() bool {
@@ -111,25 +111,34 @@ func (b *Block) Tick(under *Block) {
 			return
 		}
 	}
+	fmt.Print("Tick", under, "\r\n")
 
 	switch b.state {
 	case STATIC, SWAP:
+		fmt.Print("STATIC, SWAP")
 		if b.color == AIR {
+			fmt.Print("-AIR", b.color)
 			return
 		}
 		switch {
 		case under.state == HANG:
+			fmt.Print("-HANG")
 			b.state = HANG
 			b.counter = under.counter
 			b.chain = under.chain
 		case under.IsEmpty():
+			fmt.Print("-EMPTY")
 			b.state = HANG
 			b.counter = hangticks
+		default:
+			fmt.Print("-DEFAULT")
 		}
 	case HANG:
+		fmt.Print("HANG")
 		b.state = FALL
 		fallthrough
 	case FALL:
+		fmt.Print("FALL")
 		if under.IsEmpty() {
 			under.Become(b)
 			b.Become(&Block{})
@@ -145,8 +154,8 @@ func (b *Block) Tick(under *Block) {
 /* Create a new blocks array and fill it with the old shifted 1 up */
 func (g *Game) Push() {
 	blocks := newBlocks(g.width, g.height+1)
-	for y, row := range g.blocks {
-		for x, block := range row {
+	for x, col := range g.blocks {
+		for y, block := range col {
 			fmt.Println(x, y)
 			fmt.Println(blocks[x][y])
 			blocks[x][y+1] = block
@@ -155,9 +164,8 @@ func (g *Game) Push() {
 }
 
 func (g *Game) MoveTick(x int) {
-	var y int
-	for y = 1; y < g.height; y++ {
-		g.blocks[y][x].Tick(&g.blocks[y-1][x])
+	for y := 1; y < g.height; y++ {
+		g.blocks[x][y].Tick(&g.blocks[x][y-1])
 	}
 }
 
@@ -168,7 +176,7 @@ func (g *Game) Tick() {
 	var x int
 	for x = 0; x < g.width; x++ {
 		//go g.MoveTick(x)
-		go g.MoveTick(x)
+		g.MoveTick(x)
 	}
 	// check clear
 	// spawn garbage
@@ -199,7 +207,7 @@ func newGame(width, height, colors int) *Game {
 }
 
 func main() {
-	grid := colorgrid.Grid{Cell: colorgrid.Size{5, 3}}
+	grid := colorgrid.NewGrid(5, 3, colorgrid.WHITE, colorgrid.BLACK)
 	fmt.Println("START")
 	control := keydown.NewController()
 	player := defaultPlayer()
@@ -241,7 +249,9 @@ func main() {
 		default:
 			fmt.Print(".")
 		}
-
+		fmt.Print("TICK")
+		player.game.Tick()
+		fmt.Print("RENDER")
 		player.game.render(grid)
 	}
 }

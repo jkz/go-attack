@@ -1,17 +1,16 @@
 package main
 
 import (
-	"fmt"
 	"github.com/jessethegame/colorgrid"
 )
 
 func (b Block) render(g colorgrid.Grid) {
-	g.Render(b.pos.x, b.pos.y, fmt.Sprintf("%d", b.counter), colorgrid.BLACK, b.color)
+	g.Cell(b.pos.x, b.pos.y, rune(b.counter+'0'), colorgrid.WHITE, b.color)
 }
 
 func (b Block) cursor(g colorgrid.Grid) {
-	g.Render(b.pos.x, b.pos.y, "[", colorgrid.BLACK, colorgrid.WHITE)
-	g.Render(b.pos.x+1, b.pos.y, "]", colorgrid.BLACK, colorgrid.WHITE)
+	g.Cell(b.pos.x, b.pos.y, '[', colorgrid.BLACK, colorgrid.WHITE)
+	g.Cell(b.pos.x+1, b.pos.y, ']', colorgrid.BLACK, colorgrid.WHITE)
 }
 
 func (game Game) render(g colorgrid.Grid) {
@@ -25,6 +24,8 @@ func (game Game) render(g colorgrid.Grid) {
 }
 
 func (p Player) render(g colorgrid.Grid) {
+	g.Clear()
+	g.Flush()
 	p.game.render(g)
 	p.cursor.cursor(g)
 	//g.Cursor(p.Block)
