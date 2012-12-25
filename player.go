@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/jessethegame/keydown"
+	"github.com/jessethegame/colorgrid"
 )
 
 type keys struct {
