@@ -28,15 +28,29 @@ var fallticks int = 4
 var swapticks int = 4
 var clearticks int = 4
 
+type command int
+
+const (
+	PUSH command = iota
+	PAUSE
+	QUIT
+)
+
 type Config struct {
 	tickrate, hangticks, fallticks, swapticks, clearticks int
+}
+
+type coord struct {
+	x, y int
 }
 
 type Game struct {
 	width, height, colors int
 	combo, chain          int
-	rows                  [][]Block
+	blocks                [][]Block
 	config                *Config
+	swap                  chan coord
+	command               chan command
 }
 
 type State int
@@ -59,7 +73,7 @@ type Garbage struct {
 
 type Block struct {
 	above, under, left, right *Block
-	x, y                      int
+	pos                       coord
 	color                     colorgrid.Color
 	state                     State
 	counter                   int
@@ -79,7 +93,7 @@ func (b *Block) IsSwappable() bool {
 }
 
 func (b *Block) IsEmpty() bool {
-	return b.color == AIR && b.counter == 0
+	return b.counter == 0 && b.color == AIR
 }
 
 func (b *Block) IsSupport() bool {
@@ -90,6 +104,7 @@ func (b *Block) IsSupport() bool {
 This tick phase checks all blocks for their individual state.
 */
 func (b *Block) Tick(under *Block) {
+	// If the block has a counter, decrement it, return if it is not done
 	if b.counter > 0 {
 		b.counter--
 		if b.counter > 0 {
@@ -127,14 +142,14 @@ func (b *Block) Tick(under *Block) {
 	}
 }
 
-/* Create a new rows array and fill it with the old shifted 1 up */
+/* Create a new blocks array and fill it with the old shifted 1 up */
 func (g *Game) Push() {
-	rows := NewRows(g.width, g.height+1)
-	for y, row := range g.rows {
+	blocks := newBlocks(g.width, g.height+1)
+	for y, row := range g.blocks {
 		for x, block := range row {
 			fmt.Println(x, y)
-			fmt.Println(rows[x][y])
-			rows[x][y+1] = block
+			fmt.Println(blocks[x][y])
+			blocks[x][y+1] = block
 		}
 	}
 }
@@ -142,7 +157,7 @@ func (g *Game) Push() {
 func (g *Game) MoveTick(x int) {
 	var y int
 	for y = 1; y < g.height; y++ {
-		g.rows[y][x].Tick(&g.rows[y-1][x])
+		g.blocks[y][x].Tick(&g.blocks[y-1][x])
 	}
 }
 
@@ -159,60 +174,55 @@ func (g *Game) Tick() {
 	// spawn garbage
 }
 
-/* Create a new array of rows with one extra for spawning blocks */
-func NewRows(width, height int) [][]Block {
-	rows := make([][]Block, height, 1+height)
+/* Create a new array of blocks with one extra for spawning blocks */
+func newBlocks(width, height int) [][]Block {
+	blocks := make([][]Block, width)
 
-	for i, _ := range rows {
-		rows[i] = make([]Block, width)
+	for i, _ := range blocks {
+		blocks[i] = make([]Block, height+1)
 	}
-	return rows
+	return blocks
 }
 
 /* NewGame Initializes a game with a viewport of x * y and given amount of
  * block colors */
-func NewGame(width, height, colors int) *Game {
+func newGame(width, height, colors int) *Game {
 	// Set a buffer capacity of twice the height to allow for some garbage
 	// and an extra line for spawning blocks
 	return &Game{
 		width:  width,
 		height: height,
 		colors: colors,
-		rows:   NewRows(width, height)}
+		blocks: newBlocks(width, height)}
 }
 
-var FRAME int = 0
-
 func main() {
-	grid := colorgrid.Grid{Cell: colorgrid.Size{5, 3}}
-	player := newPlayer()
-	out := make(chan keydown.Op)
-	go keydown.Enable(&cursor, out)
-
-	ch := make(chan int, 10)
-	//cX := cursor.X
-	//cY := game.height - cursor.Y
-	go runTicker(ch)
-	//gch := make(chan *Game, 10)
-	//go render(gch)
-	for i := range ch {
-		/*
-			select {
-			case <-out:
-				cX = cursor.X
-				cY = game.height - cursor.Y
-			default:
+	//grid := colorgrid.Grid{Cell: colorgrid.Size{5, 3}}
+	fmt.Println("START")
+	control := keydown.NewController()
+	player := defaultPlayer()
+	fmt.Println("INPUT")
+	frames := newTicker()
+	go control.Run()
+	go player.listen(control.Input)
+	go runTicker(frames)
+	for frame := range frames {
+		fmt.Print("FRAME", frame, "\n")
+		select {
+		case pos := <-player.game.swap:
+			fmt.Printf("SWAP", pos, "\n")
+		case com := <-player.game.command:
+			switch com {
+			case PUSH:
+				fmt.Println("PUSH")
+			case PAUSE:
+				fmt.Println("PAUSE")
+			case QUIT:
+				fmt.Println("QUIT")
+				control.Stop <- true
 			}
-		*/
-		cX := cursor.X
-		cY := game.height - cursor.Y
-		//gch <- &game
-		fmt.Println(i)
-		render(&game, cX, cY)
-		game.Tick()
-		FRAME += 1
-		game.grid.Render(1, 0, fmt.Sprintf("%d", FRAME), colorgrid.WHITE,
-			colorgrid.BLACK)
-		//fmt.Printf("%d", FRAME)
+		default:
+			fmt.Print(".")
+		}
 	}
 }

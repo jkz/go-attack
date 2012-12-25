@@ -6,17 +6,17 @@ import (
 )
 
 func (b Block) render(g colorgrid.Grid) {
-	g.Render(x, y, fmt.Sprintf("%d", b.counter), colorgrid.BLACK, b.color)
+	g.Render(b.pos.x, b.pos.y, fmt.Sprintf("%d", b.counter), colorgrid.BLACK, b.color)
 }
 
 func (b Block) cursor(g colorgrid.Grid) {
-	g.Render(b.x, b.y, "[", colorgrid.BLACK, colorgrid.WHITE)
-	g.Render(b.x+1, b.y, "]", colorgrid.BLACK, colorgrid.WHITE)
+	g.Render(b.pos.x, b.pos.y, "[", colorgrid.BLACK, colorgrid.WHITE)
+	g.Render(b.pos.x+1, b.pos.y, "]", colorgrid.BLACK, colorgrid.WHITE)
 }
 
 func (game Game) render(g colorgrid.Grid) {
-	for y, row := range game.rows {
-		for x, block := range row {
+	for _, row := range game.blocks {
+		for _, block := range row {
 			block.render(g)
 		}
 	}
@@ -24,5 +24,5 @@ func (game Game) render(g colorgrid.Grid) {
 
 func (p Player) render(g colorgrid.Grid) {
 	p.game.render(g)
-	g.Cursor(p.Block)
+	//g.Cursor(p.Block)
 }
