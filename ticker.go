@@ -13,9 +13,3 @@ func runTicker(ch chan int) {
 		ch <- i
 	}
 }
-
-func newTicker() chan int {
-	ch := make(chan int, 10)
-	go runTicker(ch)
-	return ch
-}

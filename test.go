@@ -99,7 +99,7 @@ func defaultKeys() keys {
 		home:   'H',
 		end:    'L',
 
-		swap: 'f',
+		swap: 32,
 		push: 'd',
 
 		quit:  'q',

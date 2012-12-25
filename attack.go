@@ -190,28 +190,42 @@ func newGame(width, height, colors int) *Game {
 	// Set a buffer capacity of twice the height to allow for some garbage
 	// and an extra line for spawning blocks
 	return &Game{
-		width:  width,
-		height: height,
-		colors: colors,
-		blocks: newBlocks(width, height)}
+		width:   width,
+		height:  height,
+		colors:  colors,
+		blocks:  newBlocks(width, height),
+		swap:    make(chan coord, 10),
+		command: make(chan command, 10)}
 }
 
 func main() {
-	//grid := colorgrid.Grid{Cell: colorgrid.Size{5, 3}}
+	grid := colorgrid.Grid{Cell: colorgrid.Size{5, 3}}
 	fmt.Println("START")
 	control := keydown.NewController()
 	player := defaultPlayer()
 	fmt.Println("INPUT")
-	frames := newTicker()
+	frames := make(chan int, 10)
 	go control.Run()
 	go player.listen(control.Input)
 	go runTicker(frames)
 	for frame := range frames {
-		fmt.Print("FRAME", frame, "\n")
+		//fmt.Print("F", frame)
+		frame++
 		select {
-		case pos := <-player.game.swap:
-			fmt.Printf("SWAP", pos, "\n")
-		case com := <-player.game.command:
+		case pos, ok := <-player.game.swap:
+			if ok {
+				fmt.Print("SWAP", pos, "\r\n")
+			} else {
+				fmt.Print("NOT SWAP", pos, "\r\n")
+				control.Stop <- true
+			}
+		case com, ok := <-player.game.command:
+			if !ok {
+				fmt.Print("NOT com:", com, "\r\n")
+				control.Stop <- true
+				return
+			}
+			fmt.Print("com:", com)
 			switch com {
 			case PUSH:
 				fmt.Println("PUSH")
@@ -220,9 +234,14 @@ func main() {
 			case QUIT:
 				fmt.Println("QUIT")
 				control.Stop <- true
+				return
+			default:
+				fmt.Print("defaulted")
 			}
 		default:
 			fmt.Print(".")
 		}
+
+		player.game.render(grid)
 	}
 }

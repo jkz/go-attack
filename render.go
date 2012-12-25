@@ -15,8 +15,10 @@ func (b Block) cursor(g colorgrid.Grid) {
 }
 
 func (game Game) render(g colorgrid.Grid) {
-	for _, row := range game.blocks {
-		for _, block := range row {
+	for x, col := range game.blocks {
+		for y, block := range col {
+			block.pos.x = x
+			block.pos.y = y
 			block.render(g)
 		}
 	}
@@ -24,5 +26,6 @@ func (game Game) render(g colorgrid.Grid) {
 
 func (p Player) render(g colorgrid.Grid) {
 	p.game.render(g)
+	p.cursor.cursor(g)
 	//g.Cursor(p.Block)
 }
