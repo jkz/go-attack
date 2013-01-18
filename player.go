@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/jessethegame/colorgrid"
+	"github.com/jessethegame/colorgrid/keydown"
 )
 
 type keys struct {
@@ -26,6 +26,7 @@ func (p *Player) listen(ch chan keydown.Key) {
 		select {
 		case key := <-ch:
 			fmt.Print("KEY", key)
+			fmt.Print(p.cursor)
 			switch key {
 			case p.keys.up:
 				fmt.Print("UP")

@@ -114,6 +114,6 @@ func defaultPlayer() Player {
 		game: defaultGame(),
 		keys: defaultKeys(),
 	}
-	p.cursor = &p.game.blocks[p.game.width/2][p.game.height/2]
+	p.cursor = &(p.game.blocks[p.game.width/2][p.game.height/2])
 	return p
 }

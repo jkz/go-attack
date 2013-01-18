@@ -15,9 +15,13 @@ y-2  = = = = = =
 0    + + + + + +
 */
 
-import "fmt"
-import "github.com/jessethegame/keydown"
-import "github.com/jessethegame/colorgrid"
+import (
+	"fmt"
+	"github.com/jessethegame/colorgrid"
+	"github.com/jessethegame/colorgrid/keydown"
+)
+
+//import "github.com/jessethegame/colorgrid"
 
 // ticks / second
 var tickrate = 1
@@ -51,12 +55,13 @@ type Game struct {
 	config                *Config
 	swap                  chan coord
 	command               chan command
+	paused                bool
 }
 
 type State int
 
 const (
-	AIR  colorgrid.Color = colorgrid.BLACK
+	AIR  colorgrid.Color = colorgrid.DEFAULT
 	ROCK                 = colorgrid.WHITE
 	// Everything > ROCK is a color
 )
@@ -72,16 +77,24 @@ type Garbage struct {
 }
 
 type Block struct {
-	//above, under, left, right *Block
-	pos     coord
-	color   colorgrid.Color
-	state   State
-	counter int
-	//chain   bool
+	above, under, left, right *Block
+	pos                       coord
+	color                     colorgrid.Color
+	state                     State
+	counter                   int
+	chain                     bool
+	is_cursor                 bool
 	//garbage *Garbage
 }
 
 func (b *Block) Become(other *Block) {
+	b.under, b.above, b.left, b.right, other.under, other.above, other.left,
+		other.right = other.under, other.above, other.left, other.right, b.under,
+		b.above, b.left, b.right
+	b.under.above = other
+	b.above.under = other
+	b.right.left = other
+	b.left.right = other
 	b.color = other.color
 	b.state = other.state
 	b.counter = other.counter
@@ -111,34 +124,34 @@ func (b *Block) Tick(under *Block) {
 			return
 		}
 	}
-	fmt.Print("Tick", under, "\r\n")
+	//fmt.Print("Tick", under, "\r\n")
 
 	switch b.state {
 	case STATIC, SWAP:
-		fmt.Print("STATIC, SWAP")
+		//fmt.Print("STATIC, SWAP")
 		if b.color == AIR {
-			fmt.Print("-AIR", b.color)
+			//fmt.Print("-AIR", b.color)
 			return
 		}
 		switch {
 		case under.state == HANG:
-			fmt.Print("-HANG")
+			//fmt.Print("-HANG")
 			b.state = HANG
 			b.counter = under.counter
 			b.chain = under.chain
 		case under.IsEmpty():
-			fmt.Print("-EMPTY")
+			//fmt.Print("-EMPTY")
 			b.state = HANG
 			b.counter = hangticks
 		default:
-			fmt.Print("-DEFAULT")
+			//fmt.Print("-DEFAULT")
 		}
 	case HANG:
-		fmt.Print("HANG")
+		//fmt.Print("HANG")
 		b.state = FALL
 		fallthrough
 	case FALL:
-		fmt.Print("FALL")
+		//fmt.Print("FALL")
 		if under.IsEmpty() {
 			under.Become(b)
 			b.Become(&Block{})
@@ -207,7 +220,8 @@ func newGame(width, height, colors int) *Game {
 }
 
 func main() {
-	grid := colorgrid.NewGrid(5, 3, colorgrid.WHITE, colorgrid.BLACK)
+	//grid := colorgrid.NewGrid(5, 3, colorgrid.WHITE, colorgrid.BLACK)
+	grid := colorgrid.NewGrid(2, 1, colorgrid.WHITE, colorgrid.BLACK)
 	fmt.Println("START")
 	control := keydown.NewController()
 	player := defaultPlayer()
@@ -239,6 +253,7 @@ func main() {
 				fmt.Println("PUSH")
 			case PAUSE:
 				fmt.Println("PAUSE")
+				player.game.paused = !player.game.paused
 			case QUIT:
 				fmt.Println("QUIT")
 				control.Stop <- true
@@ -247,11 +262,10 @@ func main() {
 				fmt.Print("defaulted")
 			}
 		default:
-			fmt.Print(".")
 		}
-		fmt.Print("TICK")
-		player.game.Tick()
-		fmt.Print("RENDER")
-		player.game.render(grid)
+		if !player.game.paused {
+			player.game.Tick()
+			player.game.render(grid)
+		}
 	}
 }
