@@ -18,10 +18,8 @@ y-2  = = = = = =
 import (
 	"fmt"
 	"github.com/jessethegame/colorgrid"
-	"github.com/jessethegame/colorgrid/keydown"
+	"github.com/jessethegame/keydown"
 )
-
-//import "github.com/jessethegame/colorgrid"
 
 // ticks / second
 var tickrate = 1
@@ -31,6 +29,8 @@ var hangticks int = 10
 var fallticks int = 4
 var swapticks int = 4
 var clearticks int = 4
+
+var Wall *Block
 
 type command int
 
@@ -62,6 +62,7 @@ type State int
 
 const (
 	AIR  colorgrid.Color = colorgrid.DEFAULT
+	WALL                 = colorgrid.WHITE
 	ROCK                 = colorgrid.WHITE
 	// Everything > ROCK is a color
 )
@@ -71,6 +72,7 @@ const (
 	HANG
 	FALL
 	SWAP
+	CLEAR
 )
 
 type Garbage struct {
@@ -87,86 +89,37 @@ type Block struct {
 	//garbage *Garbage
 }
 
+type Cursor struct {
+	pos         coord
+	color       colorgrid.Color
+	left, right *Block
+}
+
 func (b *Block) Become(other *Block) {
 	b.under, b.above, b.left, b.right, other.under, other.above, other.left,
 		other.right = other.under, other.above, other.left, other.right, b.under,
 		b.above, b.left, b.right
-	b.under.above = other
-	b.above.under = other
-	b.right.left = other
-	b.left.right = other
+	if b.under != nil {
+		b.under.above = other
+	}
+	if b.above != nil {
+		b.above.under = other
+	}
+	if b.right != nil {
+		b.right.left = other
+	}
+	if b.left != nil {
+		b.left.right = other
+	}
 	b.color = other.color
 	b.state = other.state
 	b.counter = other.counter
 	//b.garbage = other.garbage
 }
 
-func (b *Block) IsSwappable() bool {
-	return b.counter == 0
-}
-
-func (b *Block) IsEmpty() bool {
-	return b.counter == 0 && b.color == AIR
-}
-
-func (b *Block) IsSupport() bool {
-	return b.state != FALL
-}
-
-/*
-This tick phase checks all blocks for their individual state.
-*/
-func (b *Block) Tick(under *Block) {
-	// If the block has a counter, decrement it, return if it is not done
-	if b.counter > 0 {
-		b.counter--
-		if b.counter > 0 {
-			return
-		}
-	}
-	//fmt.Print("Tick", under, "\r\n")
-
-	switch b.state {
-	case STATIC, SWAP:
-		//fmt.Print("STATIC, SWAP")
-		if b.color == AIR {
-			//fmt.Print("-AIR", b.color)
-			return
-		}
-		switch {
-		case under.state == HANG:
-			//fmt.Print("-HANG")
-			b.state = HANG
-			b.counter = under.counter
-			b.chain = under.chain
-		case under.IsEmpty():
-			//fmt.Print("-EMPTY")
-			b.state = HANG
-			b.counter = hangticks
-		default:
-			//fmt.Print("-DEFAULT")
-		}
-	case HANG:
-		//fmt.Print("HANG")
-		b.state = FALL
-		fallthrough
-	case FALL:
-		//fmt.Print("FALL")
-		if under.IsEmpty() {
-			under.Become(b)
-			b.Become(&Block{})
-		} else {
-			b.state = under.state
-			b.counter = under.counter
-		}
-	default:
-		panic("I'm not supposed to get here!")
-	}
-}
-
 /* Create a new blocks array and fill it with the old shifted 1 up */
-func (g *Game) Push() {
-	blocks := newBlocks(g.width, g.height+1)
+func (g *Game) Push(height int) {
+	blocks := newBlocks(g.width, height)
 	for x, col := range g.blocks {
 		for y, block := range col {
 			fmt.Println(x, y)
@@ -174,25 +127,6 @@ func (g *Game) Push() {
 			blocks[x][y+1] = block
 		}
 	}
-}
-
-func (g *Game) MoveTick(x int) {
-	for y := 1; y < g.height; y++ {
-		g.blocks[x][y].Tick(&g.blocks[x][y-1])
-	}
-}
-
-func (g *Game) Tick() {
-	// decr timers
-	// check movement
-	// set timers
-	var x int
-	for x = 0; x < g.width; x++ {
-		//go g.MoveTick(x)
-		g.MoveTick(x)
-	}
-	// check clear
-	// spawn garbage
 }
 
 /* Create a new array of blocks with one extra for spawning blocks */
@@ -219,53 +153,65 @@ func newGame(width, height, colors int) *Game {
 		command: make(chan command, 10)}
 }
 
-func main() {
-	//grid := colorgrid.NewGrid(5, 3, colorgrid.WHITE, colorgrid.BLACK)
-	grid := colorgrid.NewGrid(2, 1, colorgrid.WHITE, colorgrid.BLACK)
-	fmt.Println("START")
+func (p *Player) Play() {
+	grid := colorgrid.NewGrid(5, 3, colorgrid.WHITE, colorgrid.BLACK)
+	// grid := colorgrid.NewGrid(2, 1, colorgrid.WHITE, colorgrid.BLACK)
 	control := keydown.NewController()
-	player := defaultPlayer()
-	fmt.Println("INPUT")
 	frames := make(chan int, 10)
+
 	go control.Run()
-	go player.listen(control.Input)
+	go p.listen(control.Input)
 	go runTicker(frames)
+
 	for frame := range frames {
 		//fmt.Print("F", frame)
+		// Yuck, needs reference for frame
 		frame++
 		select {
-		case pos, ok := <-player.game.swap:
+		case pos, ok := <-p.game.swap:
 			if ok {
-				fmt.Print("SWAP", pos, "\r\n")
+				// fmt.Print("SWAP", pos, "\r\n")
+				p.game.Swap(p.cursor.pos)
 			} else {
 				fmt.Print("NOT SWAP", pos, "\r\n")
 				control.Stop <- true
 			}
-		case com, ok := <-player.game.command:
+			// grid.Print(0, (player.game.height+1)*grid.Size.Height, ".", colorgrid.WHITE, colorgrid.BLACK)
+			// fmt.Print(pos)
+		case com, ok := <-p.game.command:
 			if !ok {
-				fmt.Print("NOT com:", com, "\r\n")
+				// fmt.Print("NOT com:", com, "\r\n")
 				control.Stop <- true
 				return
 			}
 			fmt.Print("com:", com)
 			switch com {
 			case PUSH:
-				fmt.Println("PUSH")
+				// fmt.Println("PUSH")
 			case PAUSE:
-				fmt.Println("PAUSE")
-				player.game.paused = !player.game.paused
+				// fmt.Println("PAUSE")
+				p.game.paused = !p.game.paused
 			case QUIT:
-				fmt.Println("QUIT")
+				// fmt.Println("QUIT")
 				control.Stop <- true
 				return
 			default:
-				fmt.Print("defaulted")
+				// fmt.Print("defaulted")
 			}
 		default:
 		}
-		if !player.game.paused {
-			player.game.Tick()
-			player.game.render(grid)
+		if !p.game.paused {
+			p.game.Tick()
+			p.render(grid)
+			// player.game.render(grid)
 		}
 	}
+}
+
+func main() {
+	Wall = &Block{
+		color: colorgrid.WHITE}
+
+	player := defaultPlayer()
+	player.Play()
 }
