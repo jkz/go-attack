@@ -17,18 +17,18 @@ y-2  = = = = = =
 
 import (
 	"fmt"
-	"github.com/jessethegame/colorgrid"
-	"github.com/jessethegame/keydown"
+	"github.com/jessethegame/go-colorgrid"
+	"github.com/jessethegame/go-keydown"
 )
 
 // ticks / second
 var tickrate = 1
 
 // Time in frames
-var hangticks int = 10
+var hangticks int = 6
 var fallticks int = 4
 var swapticks int = 4
-var clearticks int = 4
+var clearticks int = 12
 
 var Wall *Block
 
@@ -117,6 +117,20 @@ func (b *Block) Become(other *Block) {
 	//b.garbage = other.garbage
 }
 
+func (b *Block) Copy(other *Block) {
+	b.state = other.state
+	b.color = other.color
+	b.counter = other.counter
+	b.chain = other.chain
+}
+
+func (b *Block) Erase() {
+	b.state = STATIC
+	b.color = AIR
+	b.counter = 0
+	b.chain = false
+}
+
 /* Create a new blocks array and fill it with the old shifted 1 up */
 func (g *Game) Push(height int) {
 	blocks := newBlocks(g.width, height)
@@ -134,7 +148,8 @@ func newBlocks(width, height int) [][]Block {
 	blocks := make([][]Block, width)
 
 	for i, _ := range blocks {
-		blocks[i] = make([]Block, height+1)
+		// blocks[i] = make([]Block, height+1)
+		blocks[i] = make([]Block, height)
 	}
 	return blocks
 }

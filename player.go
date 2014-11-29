@@ -2,7 +2,7 @@ package main
 
 import (
 	// "fmt"
-	"github.com/jessethegame/keydown"
+	"github.com/jessethegame/go-keydown"
 )
 
 type keys struct {

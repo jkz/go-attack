@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+// "fmt"
 )
 
 func (b *Block) IsSwappable() bool {
@@ -17,8 +17,7 @@ func (b *Block) IsSupport() bool {
 }
 
 func (b *Block) IsClearable() bool {
-	fmt.Print(b.under)
-	return b.IsSwappable() && b.under != nil && b.under.IsSupport()
+	return b.IsSwappable() && b.under != nil && b.under.IsSupport() && b.color != AIR
 }
 
 func (b *Block) IsComboable() bool {
@@ -26,44 +25,32 @@ func (b *Block) IsComboable() bool {
 }
 
 func (b *Block) Clear() int {
-	if b.IsClearable() {
-		return b.Combo()
-	} else {
+	if b.state == CLEAR {
 		return 0
 	}
+	b.counter = clearticks
+	b.state = CLEAR
+	b.chain = true
+	return 1
 }
 
-// This is a bit weird, it will clear combos per three horizontally
-// and vertically. To keep conditions simple, count the number of blocks
-// in the combo and propagate it, this function recursively performs
-// the same check on the neighbours. This means that in one combo, a single
-// block might be checked 6 times (2 x 3)
 func (b *Block) Combo() int {
 	var combo = 0
 
-	if b.counter > 0 {
-		return 0
-	}
-
 	if b.left.IsComboable() && b.right.IsComboable() {
 		if b.left.color == b.color && b.right.color == b.color {
-			combo += b.left.Combo()
-			combo += b.right.Combo()
+			combo += b.Clear()
+			combo += b.left.Clear()
+			combo += b.right.Clear()
 		}
 	}
 
 	if b.under.IsComboable() && b.above.IsComboable() {
 		if b.under.color == b.color && b.above.color == b.color {
-			combo += b.under.Combo()
-			combo += b.above.Combo()
+			combo += b.Clear()
+			combo += b.under.Clear()
+			combo += b.above.Clear()
 		}
-	}
-
-	if combo > 0 {
-		b.counter = clearticks
-		b.state = CLEAR
-		b.chain = true
-		combo++
 	}
 
 	return combo
@@ -83,7 +70,7 @@ func (b *Block) UpdateState() {
 		switch {
 		case b.color == AIR:
 			return
-		case b.under == nil:
+		case b.under == Wall:
 			b.state = STATIC
 		case b.under.state == HANG:
 			b.state = HANG
@@ -93,27 +80,35 @@ func (b *Block) UpdateState() {
 			b.state = HANG
 			b.counter = hangticks
 		}
-
 	case HANG:
 		b.state = FALL
 		fallthrough
 	case FALL:
-		if b.under.IsEmpty() {
-			b.under.Become(b)
-			b.Become(&Block{})
-		} else {
+		switch {
+		case b.under.IsEmpty():
+			b.under.Copy(b)
+			b.Erase()
+		case b.under.state == CLEAR:
+			b.state = STATIC
+		default:
 			b.state = b.under.state
 			b.counter = b.under.counter
 		}
+	case CLEAR:
+		b.Erase()
+		b.counter = hangticks
 	default:
-		panic("I'm not supposed to get here!")
+		panic("Unknown state!")
 	}
 
 }
 
-func (g *Game) UpdateRelativePositions() {
+func (g *Game) UpdateNeighbors() {
+	var block *Block
 	for x, col := range g.blocks {
-		for y, block := range col {
+		for y, _ := range col {
+			block = &g.blocks[x][y]
+
 			if x > 0 {
 				block.left = &g.blocks[x-1][y]
 			} else {
@@ -137,14 +132,15 @@ func (g *Game) UpdateRelativePositions() {
 			} else {
 				block.above = Wall
 			}
+
 		}
 	}
 }
 
 func (g *Game) UpdateState() {
-	for _, col := range g.blocks {
-		for _, block := range col {
-			block.UpdateState()
+	for x, col := range g.blocks {
+		for y, _ := range col {
+			g.blocks[x][y].UpdateState()
 		}
 	}
 }
@@ -152,9 +148,9 @@ func (g *Game) UpdateState() {
 func (g *Game) UpdateCombo() int {
 	var combo = 0
 
-	for _, col := range g.blocks {
-		for _, block := range col {
-			combo += block.Clear()
+	for x, col := range g.blocks {
+		for y, _ := range col {
+			combo += g.blocks[x][y].Combo()
 		}
 	}
 
@@ -169,9 +165,10 @@ func (g *Game) Swap(c coord) {
 }
 
 func (g *Game) Tick() {
-	g.UpdateRelativePositions()
+	g.UpdateNeighbors()
 	g.UpdateState()
 	var combo = g.UpdateCombo()
+	// TODO this is incorrect at the moment
 	if combo > 0 {
 		g.chain++
 	} else {

@@ -3,7 +3,8 @@ package main
 import "time"
 
 // The time between each tick
-var interval = time.Second / 10
+// var interval = time.Second / 10
+var interval = time.Second
 
 // Send a tick counter into the channel
 func runTicker(ch chan int) {

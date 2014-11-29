@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/jessethegame/colorgrid"
+	"github.com/jessethegame/go-colorgrid"
 )
 
 func (b Block) render(g colorgrid.Grid) {
